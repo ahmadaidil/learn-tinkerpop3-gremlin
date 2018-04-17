@@ -1,0 +1,19 @@
+{
+  "name": "gremlintest",
+  "version": "0.0.1",
+  "dependencies": {
+    "dotenv": "^5.0.1",
+    "express": "^4.16.3",
+    "gremlin": "^2.7.0",
+    "gremlin-client": "^1.0.3"
+  },
+  "devDependencies": {
+    "eslint": "^4.19.1",
+    "eslint-config-airbnb-base": "^12.1.0",
+    "eslint-plugin-import": "^2.11.0"
+  },
+  "scripts": {
+    "start": "nodemon app.js",
+    "test": "node test.js"
+  }
+}
