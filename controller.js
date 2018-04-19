@@ -15,7 +15,7 @@ const getQueryOfConditionFromType = (type, condition) => {
       switch (condition) {
         case 'prefix': return 'textPrefix';
         case 'fuzzy': return 'textFuzzy';
-        case 'regex': return 'regex';
+        case 'regex': return 'textRegex';
         default: return 'eq';
       }
     }
