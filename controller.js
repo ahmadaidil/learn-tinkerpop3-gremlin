@@ -32,56 +32,89 @@ const getQueryOfConditionFromType = (type, condition) => {
   }
 };
 
-const getLogicOperator = (prevFilter, nextFilter, logicOperator) => {
-  if (nextFilter !== undefined) {
-    let operator = '';
-    if (logicOperator === 'OR') {
-      operator += '.or()';
-    } else operator += '.and()';
-    if (prevFilter.objectType === 'vertex' && nextFilter.objectType === 'edge') {
-      operator += '.bothE()';
+const getOrCollections = (filters) => {
+  const orCollections = [];
+  let andCollections = [];
+  filters.forEach((filter, index) => {
+    if (index !== filters.length - 1) {
+      if (filter.logicOperator === 'AND') {
+        andCollections.push(filter);
+      } else if (filter.logicOperator === 'OR') {
+        if (andCollections.length > 0) {
+          orCollections.push(andCollections);
+          andCollections = [];
+        }
+        orCollections.push(filter);
+      }
+    } else if (index === filters.length - 1) {
+      if (filters[index - 1].logicOperator === 'AND') {
+        andCollections.push(filter);
+        orCollections.push(andCollections);
+      } else orCollections.push(filter);
     }
-    if (prevFilter.objectType === 'edge' && nextFilter.objectType === 'vertex') {
-      operator += '.otherV()';
-    }
-    return operator;
-  }
-  return '';
+  });
+  return orCollections;
 };
 
-const getGraphsByFilter = (filters, dataSourceIds = ['12', '34', '56'], vertexId = 'all-000', limit=50) => {
-  return new Promise ((resolve, reject) => {
+const getQueries = ({
+  objectType, dataType, condition, property, value,
+}) => {
+  const conditionQuery = getQueryOfConditionFromType(dataType, condition);
+  const hasQueryTextOrString = `has('${property}', ${conditionQuery}('${value}'))`;
+  const hasQueryNumberOrDate = `has('${property}', ${conditionQuery}(${value}))`;
+  let query = '';
+  if (objectType === 'edge') query += 'bothE().';
+  query += dataType === 'text' || dataType === 'string' ? hasQueryTextOrString : hasQueryNumberOrDate;
+  return query;
+};
+
+const getGraphsByFilter = (filters, dataSourceIds = ['12', '34', '56'], vertexId = 'all-000', limit = 50) => (
+  new Promise((resolve, reject) => {
     const newClient = client();
-    const limitQuery = `limit(${limit})`;
-    let getVertex = `g.V().${limitQuery}`;
-    if (vertexId !== 'all-000') {
-      getVertex = `g.V(${vertexId}).${limitQuery}`;
-    }
-    if (dataSourceIds.length) {
-      getVertex += `.has('_data_source_id', within('${dataSourceIds.join("', '")}'))`;
-    }
+    const limitQuery = `.limit(${limit})`;
+    let getVertexQuery = 'g.V()';
+    let query = '';
+    if (vertexId !== 'all-000') getVertexQuery = `g.V(${vertexId})`;
+    if (limit) getVertexQuery += limitQuery;
+    if (dataSourceIds.length) query += `.has('_data_source_id', within('${dataSourceIds.join("', '")}'))`;
     const { fullTextSearch, advance } = filters;
     if (advance.length) {
-      advance.forEach(({
-        objectType, property, condition, value, logicOperator, dataType,
-      }, index) => {
-        const conditionQuery = getQueryOfConditionFromType(dataType, condition);
-        const hasQueryString = `.has('${property}', ${conditionQuery}('${value}'))`;
-        const hasQueryNumberOrDate = `.has('${property}', ${conditionQuery}(${value}))`;
-        if (index === 0 && objectType === 'edge') {
-          getVertex += '.bothE()';
-        }
-        getVertex += dataType === 'text' || dataType === 'string' ? hasQueryString : hasQueryNumberOrDate;
-        getVertex += getLogicOperator(advance[index], advance[index + 1], logicOperator);
-      });
+      if (advance.findIndex(({ logicOperator }) => logicOperator === 'OR') >= 0) {
+        const orCollections = getOrCollections(advance);
+        // console.log(orCollections);
+        query += '.or(';
+        orCollections.forEach((collection, index) => {
+          if (collection instanceof Array) {
+            if (index > 0) query += ', ';
+            let andQuery = 'and(';
+            collection.forEach((filter, idx) => {
+              if (idx > 0) andQuery += ', ';
+              andQuery += getQueries(filter);
+            });
+            andQuery += ')';
+            query += andQuery;
+          } else if (collection instanceof Object) {
+            if (index > 0) query += ', ';
+            query += getQueries(collection);
+          }
+        });
+        query += ')';
+      } else {
+        query += '.and(';
+        advance.forEach((filter, index) => {
+          if (index > 0) query += ', ';
+          query += getQueries(filter);
+        });
+        query += ')';
+      }
     }
-    console.log(getVertex);
+    console.log(getVertexQuery + query);
     newClient.execute('g.V().count()', (err, results) => {
       if (err) {
         reject(err);
       } resolve(results);
     });
-  });
-};
+  })
+);
 
 module.exports = getGraphsByFilter;
