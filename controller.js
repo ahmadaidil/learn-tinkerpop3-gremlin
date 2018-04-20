@@ -1,3 +1,5 @@
+/* eslint no-console: 0 */
+
 const client = require('./client');
 
 const getQueryOfConditionFromType = (type, condition) => {
