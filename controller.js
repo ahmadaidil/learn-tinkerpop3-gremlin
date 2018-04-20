@@ -74,21 +74,50 @@ const getQueries = ({
   return query;
 };
 
-const getGraphsByFilter = (filters, dataSourceIds = ['12', '34', '56'], vertexId = 'all-000', limit = 50) => (
+const queryExecutor = (graph, query) => (
   new Promise((resolve, reject) => {
     const newClient = client();
-    const { fullTextSearch, advance } = filters;
-    const limitQuery = `.limit(${limit})`;
-    let getGraphQuery = 'g.V()';
+    console.log('masuk sini', graph + query);
+    newClient.execute(graph + query, (err, results) => {
+      if (err) {
+        reject(err);
+      } resolve(results);
+    });
+  })
+);
+
+const getGraphData = (graph, query) => (
+  new Promise(async (resolve, reject) => {
+    const data = {};
+    try {
+      if (graph.graphTypeQuery) {
+        const result = await queryExecutor(graph.graphTypeQuery, query);
+        data[graph.isVertex ? 'vertices' : 'edges'] = result;
+      } else {
+        const verticesResult = await queryExecutor('g.V()', query);
+        const edgesResult = await queryExecutor('g.E()', query);
+        data.vertices = verticesResult;
+        data.edges = edgesResult;
+      }
+      resolve(data);
+    } catch (err) {
+      reject(err);
+    }
+  })
+);
+
+const getGraphsByFilter = (filters, dataSourceIds = [], vertexId = 'all-000', limit = 0) => (
+  new Promise((resolve, reject) => {
+    const { fullTextSearch: { value: fValue, limit: fLimit }, advance } = filters;
+    let graphTypeQuery = 'g.V()';
     let isVertex = true;
     let query = '';
     if (vertexId === 'all-000') {
-      if (advance[0].objectType === 'edge') {
-        getGraphQuery = 'g.E()';
+      if (advance.length && advance[0].objectType === 'edge') {
+        graphTypeQuery = 'g.E()';
         isVertex = false;
       }
-    } else getGraphQuery = `g.V(${vertexId})`;
-    if (limit) getGraphQuery += limitQuery;
+    } else graphTypeQuery = `g.V(${vertexId})`;
     if (dataSourceIds.length) query += `.has('_data_source_id', within('${dataSourceIds.join("', '")}'))`;
     if (advance.length) {
       if (advance.findIndex(({ logicOperator }) => logicOperator === 'OR') >= 0) {
@@ -120,12 +149,19 @@ const getGraphsByFilter = (filters, dataSourceIds = ['12', '34', '56'], vertexId
         query += ')';
       }
     }
-    console.log(getGraphQuery + query);
-    newClient.execute('g.V().count()', (err, results) => {
-      if (err) {
-        reject(err);
-      } resolve(results);
-    });
+    if (limit) query += `.limit(${limit})`;
+    if (fValue) {
+      query += `.where(properties().hasValue('${fValue}'))`;
+      if (fLimit) query += `.limit(${fLimit})`;
+      if (vertexId === 'all-000' && !advance.length) {
+        console.log('jalanin g.V dan g.E');
+        graphTypeQuery = '';
+      }
+    }
+    const graph = graphTypeQuery ? ({ graphTypeQuery, isVertex }) : ({ graphTypeQuery });
+    getGraphData(graph, query)
+      .then(response => resolve(response))
+      .catch(err => reject(err));
   })
 );
 
