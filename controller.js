@@ -81,9 +81,8 @@ const queryExecutor = (graph, query) => (
     const newClient = client();
     console.log('masuk sini', graph + query);
     newClient.execute(graph + query, (err, results) => {
-      if (err) {
-        reject(err);
-      } resolve(results);
+      if (err) reject(err);
+      resolve(results);
     });
   })
 );
@@ -93,11 +92,11 @@ const getGraphData = (graph, query) => (
     const data = {};
     try {
       if (graph.graphTypeQuery) {
-        const result = await queryExecutor(graph.graphTypeQuery, query);
+        const result = await queryExecutor(graph.graphTypeQuery, `${query}.valueMap(true)`);
         data[graph.isVertex ? 'vertices' : 'edges'] = result;
       } else {
         const verticesResult = await queryExecutor('g.V()', query);
-        const edgesResult = await queryExecutor('g.E()', query);
+        const edgesResult = await queryExecutor('g.E()', `${query}.valueMap(true)`);
         data.vertices = verticesResult;
         data.edges = edgesResult;
       }
@@ -108,7 +107,7 @@ const getGraphData = (graph, query) => (
   })
 );
 
-const getGraphsByFilter = (filters, dataSourceIds = [], vertexId = 'all-000', limit = 0) => (
+const getGraphsByFilter = (filters, dataSourceIds = [], vertexId = 'all-000', limit = 10) => (
   new Promise((resolve, reject) => {
     const { fullTextSearch: { value: fValue, limit: fLimit }, advance } = filters;
     let graphTypeQuery = 'g.V()';
@@ -149,6 +148,9 @@ const getGraphsByFilter = (filters, dataSourceIds = [], vertexId = 'all-000', li
           query += getQueries(filter, isVertex);
         });
         query += ')';
+      }
+      if (advance.length === 1) {
+        query = `.${getQueries(advance[0], isVertex)}`;
       }
     }
     if (limit) query += `.limit(${limit})`;
