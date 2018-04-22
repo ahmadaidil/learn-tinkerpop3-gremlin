@@ -134,17 +134,13 @@ const getGraphByFilter = (filters, dataSourceIds = [], vertexId = 'all-000', lim
           const orCollections = getOrCollections(advanced);
           query += '.or(';
           orCollections.forEach((collection, index) => {
-            if (collection instanceof Array) {
-              if (index > 0) query += ', ';
-              query += getAndQuery(collection, isVertex);
-            } else if (collection instanceof Object) {
-              if (index > 0) query += ', ';
-              query += getQueries(collection, isVertex);
-            }
+            if (index > 0) query += ', ';
+            if (collection instanceof Array) query += getAndQuery(collection, isVertex);
+            else if (collection instanceof Object) query += getQueries(collection, isVertex);
           });
           query += ')';
         } else query += `.${getAndQuery(advanced, isVertex)}`;
-      } else query = `.${getQueries(advanced[0], isVertex)}`;
+      } else query += `.${getQueries(advanced[0], isVertex)}`;
       if (limit) query += `.limit(${limit})`;
     }
     if (fValue) {
