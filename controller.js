@@ -48,10 +48,8 @@ const getOrCollections = (filters) => {
         } else {
           if (andCollections.length) {
             orCollections.push(andCollections);
-          }
-          orCollections.push(filter);
-        }
-        andCollections = [];
+          } orCollections.push(filter);
+        } andCollections = [];
       }
     } else if (index === filters.length - 1) {
       if (filters[index - 1].logicOperator === 'AND') {
@@ -145,20 +143,14 @@ const getGraphsByFilter = (filters, dataSourceIds = [], vertexId = 'all-000', li
             }
           });
           query += ')';
-        } else {
-          query += `.${getAndQuery(advanced, isVertex)}`;
-        }
-      } else {
-        query = `.${getQueries(advanced[0], isVertex)}`;
-      }
+        } else query += `.${getAndQuery(advanced, isVertex)}`;
+      } else query = `.${getQueries(advanced[0], isVertex)}`;
       if (limit) query += `.limit(${limit})`;
     }
     if (fValue) {
       query += `.where(properties().hasValue('${fValue}'))`;
       if (fLimit) query += `.limit(${fLimit})`;
-      if (vertexId === 'all-000' && !advanced.length) {
-        graphTypeQuery = '';
-      }
+      if (vertexId === 'all-000' && !advanced.length) graphTypeQuery = '';
     }
     const graph = graphTypeQuery ? ({ graphTypeQuery, isVertex }) : ({ graphTypeQuery });
     query += '.valueMap(true)';
