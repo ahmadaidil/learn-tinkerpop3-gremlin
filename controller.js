@@ -76,6 +76,16 @@ const getQueries = ({
   return query;
 };
 
+const getAndQuery = (filterAnd, isVertex) => {
+  let query = 'and(';
+  filterAnd.forEach((and, index) => {
+    if (index > 0) query += ', ';
+    query += getQueries(and, isVertex);
+  });
+  query += ')';
+  return query;
+};
+
 const queryExecutor = (graph, query) => (
   new Promise((resolve, reject) => {
     const newClient = client();
@@ -89,14 +99,14 @@ const queryExecutor = (graph, query) => (
 
 const getGraphData = (graph, query) => (
   new Promise(async (resolve, reject) => {
-    const data = {};
+    const data = { vertices: [], edges: [] };
     try {
       if (graph.graphTypeQuery) {
-        const result = await queryExecutor(graph.graphTypeQuery, `${query}.valueMap(true)`);
+        const result = await queryExecutor(graph.graphTypeQuery, query);
         data[graph.isVertex ? 'vertices' : 'edges'] = result;
       } else {
         const verticesResult = await queryExecutor('g.V()', query);
-        const edgesResult = await queryExecutor('g.E()', `${query}.valueMap(true)`);
+        const edgesResult = await queryExecutor('g.E()', query);
         data.vertices = verticesResult;
         data.edges = edgesResult;
       }
@@ -108,61 +118,50 @@ const getGraphData = (graph, query) => (
 );
 
 const getGraphsByFilter = (filters, dataSourceIds = [], vertexId = 'all-000', limit = 10) => (
-  new Promise((resolve, reject) => {
-    const { fullTextSearch: { value: fValue, limit: fLimit }, advance } = filters;
+  new Promise(async (resolve, reject) => {
+    const { fullTextSearch: { value: fValue, limit: fLimit }, advanced } = filters;
     let graphTypeQuery = 'g.V()';
     let isVertex = true;
     let query = '';
     if (vertexId === 'all-000') {
-      if (advance.length && advance[0].objectType === 'edge') {
+      if (advanced.length && advanced[0].objectType === 'edge') {
         graphTypeQuery = 'g.E()';
         isVertex = false;
       }
     } else graphTypeQuery = `g.V(${vertexId})`;
     if (dataSourceIds.length) query += `.has('_data_source_id', within('${dataSourceIds.join("', '")}'))`;
-    if (advance.length) {
-      if (advance.findIndex(({ logicOperator }) => logicOperator === 'OR') >= 0) {
-        const orCollections = getOrCollections(advance);
-        // console.log(orCollections);
-        query += '.or(';
-        orCollections.forEach((collection, index) => {
-          if (collection instanceof Array) {
-            if (index > 0) query += ', ';
-            let andQuery = 'and(';
-            collection.forEach((filter, idx) => {
-              if (idx > 0) andQuery += ', ';
-              andQuery += getQueries(filter, isVertex);
-            });
-            andQuery += ')';
-            query += andQuery;
-          } else if (collection instanceof Object) {
-            if (index > 0) query += ', ';
-            query += getQueries(collection, isVertex);
-          }
-        });
-        query += ')';
+    if (advanced.length) {
+      if (advanced.length > 1) {
+        if (advanced.findIndex(({ logicOperator }) => logicOperator === 'OR') >= 0) {
+          const orCollections = getOrCollections(advanced);
+          query += '.or(';
+          orCollections.forEach((collection, index) => {
+            if (collection instanceof Array) {
+              if (index > 0) query += ', ';
+              query += getAndQuery(collection, isVertex);
+            } else if (collection instanceof Object) {
+              if (index > 0) query += ', ';
+              query += getQueries(collection, isVertex);
+            }
+          });
+          query += ')';
+        } else {
+          query += `.${getAndQuery(advanced, isVertex)}`;
+        }
       } else {
-        query += '.and(';
-        advance.forEach((filter, index) => {
-          if (index > 0) query += ', ';
-          query += getQueries(filter, isVertex);
-        });
-        query += ')';
+        query = `.${getQueries(advanced[0], isVertex)}`;
       }
-      if (advance.length === 1) {
-        query = `.${getQueries(advance[0], isVertex)}`;
-      }
+      if (limit) query += `.limit(${limit})`;
     }
-    if (limit) query += `.limit(${limit})`;
     if (fValue) {
       query += `.where(properties().hasValue('${fValue}'))`;
       if (fLimit) query += `.limit(${fLimit})`;
-      if (vertexId === 'all-000' && !advance.length) {
-        console.log('jalanin g.V dan g.E');
+      if (vertexId === 'all-000' && !advanced.length) {
         graphTypeQuery = '';
       }
     }
     const graph = graphTypeQuery ? ({ graphTypeQuery, isVertex }) : ({ graphTypeQuery });
+    query += '.valueMap(true)';
     getGraphData(graph, query)
       .then(response => resolve(response))
       .catch(err => reject(err));
