@@ -115,8 +115,8 @@ const getGraphData = (graph, query) => (
   })
 );
 
-const getGraphsByFilter = (filters, dataSourceIds = [], vertexId = 'all-000', limit = 10) => (
-  new Promise(async (resolve, reject) => {
+const getGraphByFilter = (filters, dataSourceIds = [], vertexId = 'all-000', limit = 10) => (
+  new Promise((resolve, reject) => {
     const { fullTextSearch: { value: fValue, limit: fLimit }, advanced } = filters;
     let graphTypeQuery = 'g.V()';
     let isVertex = true;
@@ -160,4 +160,4 @@ const getGraphsByFilter = (filters, dataSourceIds = [], vertexId = 'all-000', li
   })
 );
 
-module.exports = getGraphsByFilter;
+module.exports = getGraphByFilter;
