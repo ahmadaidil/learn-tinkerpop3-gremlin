@@ -103,10 +103,14 @@ const getGraphData = (graph, query) => (
         const result = await queryExecutor(graph.graphTypeQuery, query);
         data[graph.isVertex ? 'vertices' : 'edges'] = result;
       } else {
-        const verticesResult = await queryExecutor('g.V()', query);
-        const edgesResult = await queryExecutor('g.E()', query);
-        data.vertices = verticesResult;
-        data.edges = edgesResult;
+        // const vertices = await queryExecutor('g.V()', query);
+        // const edges = await queryExecutor('g.E()', query);
+        const [vertices, edges] = await Promise.all([
+          queryExecutor('g.V()', query),
+          queryExecutor('g.E()', query),
+        ]); // calling async / await in parallel using Promise.all
+        data.vertices = vertices;
+        data.edges = edges;
       }
       resolve(data);
     } catch (err) {
