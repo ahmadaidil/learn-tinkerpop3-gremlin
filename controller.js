@@ -130,7 +130,8 @@ const getGraphByFilter = (filters, dataSourceIds = [], vertexId = 'all-000', lim
     if (dataSourceIds.length) query += `.has('_data_source_id', within('${dataSourceIds.join("', '")}'))`;
     if (advanced.length) {
       if (advanced.length > 1) {
-        if (advanced.findIndex(({ logicOperator }) => logicOperator === 'OR') >= 0) {
+        const indexOr = advanced.findIndex(({ logicOperator }) => logicOperator === 'OR');
+        if (indexOr >= 0 && indexOr !== advanced.length - 1) {
           const orCollections = getOrCollections(advanced);
           query += '.or(';
           orCollections.forEach((collection, index) => {
